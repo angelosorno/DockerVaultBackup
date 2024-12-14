@@ -6,8 +6,22 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
-# Ruta al archivo compose.yml (asegúrate de estar en el mismo directorio que tu compose.yml)
+# Cambiar al directorio padre si estamos dentro de DockerVaultBackup
+CURRENT_DIR=$(basename "$(pwd)")
+if [ "$CURRENT_DIR" == "DockerVaultBackup" ]; then
+    echo "Moviendo al directorio padre para ejecutar los comandos correctamente..."
+    cd ..
+fi
+
+
+# Ruta al archivo compose.yml
 COMPOSE_FILE="compose.yml"
+
+# Verificar si el archivo compose.yml existe en el directorio actual
+if [ ! -f "$COMPOSE_FILE" ]; then
+    echo "No se encontró el archivo $COMPOSE_FILE en el directorio actual. Asegúrate de estar en el directorio correcto."
+    exit 1
+fi
 
 # Extraer los nombres de los volúmenes definidos en el archivo compose.yml
 VOLUMES=$(docker compose -f $COMPOSE_FILE config --volumes)
@@ -19,10 +33,10 @@ if [ -z "$VOLUMES" ]; then
 fi
 
 # Crear una carpeta para almacenar los backups
-BACKUP_DIR="./data/volumes_backup"
+BACKUP_DIR="./data/VolumesBackup"
 mkdir -p "$BACKUP_DIR"
 
-# Detectar si estamos en un sistema Windows o Linux
+# Ajustar rutas según el sistema operativo
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
     # Convertir ruta para Docker en Windows al formato /d/... en lugar de C:/...
     BACKUP_DIR_ABS="/$(pwd | sed 's|^/c/|c:/|' | sed 's|^/d/|d:/|')/$BACKUP_DIR"
@@ -44,7 +58,7 @@ for volume in $VOLUMES; do
     if [ -n "$VOLUME_NAME" ]; then
         # Verificar si el volumen existe en el sistema de Docker
         if docker volume inspect "$VOLUME_NAME" > /dev/null 2>&1; then
-            # Crear el backup del volumen en un archivo tar.gz, sin crear un archivo .tar intermedio
+            # Crear el backup del volumen en un archivo tar.gz
             docker run --rm -v "${VOLUME_NAME}:/data" -v "$BACKUP_DIR_ABS:/backup" busybox sh -c "cd /data && tar czf /backup/${VOLUME_NAME}.tar.gz ."
             if [ $? -eq 0 ]; then
                 echo "Volumen $VOLUME_NAME respaldado correctamente en $BACKUP_DIR"

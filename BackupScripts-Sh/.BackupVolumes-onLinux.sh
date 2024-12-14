@@ -10,11 +10,17 @@ fi
 EXPECTED_VOLUMES=("couchdb3_data" "minio_data" "redis_data")
 
 # Crear una carpeta para almacenar los backups
-BACKUP_DIR="./data/volumes_backup"
-mkdir -p "$BACKUP_DIR"
+BACKUP_DIR="./data/VolumesBackup"
+mkdir -p $BACKUP_DIR
 
-# Convertir ruta para Docker en Windows al formato /d/... (en lugar de C:/...)
-BACKUP_DIR_ABS="/$(pwd | sed 's|^/c/|c:/|' | sed 's|^/d/|d:/|')/$BACKUP_DIR"
+# Detectar si estamos en un sistema Windows o Linux
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+    # Convertir ruta para Docker en Windows al formato /c/... en lugar de C:\...
+    BACKUP_DIR_ABS="/$(pwd | sed 's|C:/|c/|' | sed 's|/|/|g')/$BACKUP_DIR"
+else
+    # Si es Linux/Unix, usar la ruta tal como está
+    BACKUP_DIR_ABS=$(pwd)/$BACKUP_DIR
+fi
 
 # Mostrar la ruta final que Docker usará para montar
 echo "Ruta de backup: $BACKUP_DIR_ABS"
@@ -27,9 +33,9 @@ for expected_volume in "${EXPECTED_VOLUMES[@]}"; do
         echo "Respaldo del volumen: $VOLUME_NAME"
         
         # Verificar si el volumen existe en el sistema de Docker
-        if docker volume inspect "$VOLUME_NAME" > /dev/null 2>&1; then
+        if docker volume inspect $VOLUME_NAME > /dev/null 2>&1; then
             # Crear el backup del volumen en un archivo tar.gz
-            docker run --rm -v "${VOLUME_NAME}":/data -v "$BACKUP_DIR_ABS":/backup busybox sh -c "cd /data && tar czf /backup/${VOLUME_NAME}.tar.gz ."
+            docker run --rm -v ${VOLUME_NAME}:/data -v ${BACKUP_DIR_ABS}:/backup busybox tar czf /backup/${VOLUME_NAME}.tar.gz -C /data .
             if [ $? -eq 0 ]; then
                 echo "Volumen $VOLUME_NAME respaldado correctamente en $BACKUP_DIR"
             else

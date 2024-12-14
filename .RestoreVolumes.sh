@@ -7,7 +7,7 @@ if ! docker info > /dev/null 2>&1; then
 fi
 
 # Ruta a la carpeta donde están los backups
-BACKUP_DIR="./data/volumes_backup"
+BACKUP_DIR="./data/VolumesBackup"
 
 # Verificar si la carpeta de backups existe
 if [ ! -d "$BACKUP_DIR" ]; then
