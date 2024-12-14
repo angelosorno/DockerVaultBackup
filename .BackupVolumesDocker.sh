@@ -38,12 +38,11 @@ mkdir -p "$BACKUP_DIR"
 
 # Ajustar rutas según el sistema operativo
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
-    # Convertir ruta para Docker en Windows al formato /d/... en lugar de C:/...
-    BACKUP_DIR_ABS="/$(pwd | sed 's|^/c/|c:/|' | sed 's|^/d/|d:/|')/$BACKUP_DIR"
+    BACKUP_DIR_ABS="$(pwd | sed 's|^/|/|')/$BACKUP_DIR"
 else
-    # Si es Linux/Unix, usar la ruta tal como está
     BACKUP_DIR_ABS=$(pwd)/$BACKUP_DIR
 fi
+
 
 # Mostrar la ruta final que Docker usará para montar
 echo "Ruta de backup: $BACKUP_DIR_ABS"
@@ -74,3 +73,4 @@ for volume in $VOLUMES; do
 done
 
 echo "Todos los volúmenes han sido respaldados en la carpeta $BACKUP_DIR"
+    
