@@ -13,7 +13,6 @@ if [ "$CURRENT_DIR" == "DockerVaultBackup" ]; then
     cd ..
 fi
 
-
 # Ruta al archivo compose.yml
 COMPOSE_FILE="compose.yml"
 
@@ -24,7 +23,7 @@ if [ ! -f "$COMPOSE_FILE" ]; then
 fi
 
 # Extraer los nombres de los volúmenes definidos en el archivo compose.yml
-VOLUMES=$(docker compose -f $COMPOSE_FILE config --volumes)
+VOLUMES=$(docker compose -f "$COMPOSE_FILE" config --volumes)
 
 # Verificar si hay volúmenes listados
 if [ -z "$VOLUMES" ]; then
@@ -38,11 +37,11 @@ mkdir -p "$BACKUP_DIR"
 
 # Ajustar rutas según el sistema operativo
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
-    BACKUP_DIR_ABS="$(pwd | sed 's|^/|/|')/$BACKUP_DIR"
+    BACKUP_DIR_ABS="$(cd "$(pwd)" && pwd -W)/data/VolumesBackup"
+    BACKUP_DIR_ABS=$(echo "$BACKUP_DIR_ABS" | sed 's|\\|/|g')
 else
     BACKUP_DIR_ABS=$(pwd)/$BACKUP_DIR
 fi
-
 
 # Mostrar la ruta final que Docker usará para montar
 echo "Ruta de backup: $BACKUP_DIR_ABS"
@@ -50,7 +49,7 @@ echo "Ruta de backup: $BACKUP_DIR_ABS"
 # Realizar un backup de cada volumen
 for volume in $VOLUMES; do
     echo "Respaldo del volumen: $volume"
-    
+
     # Buscar el nombre del volumen en Docker (con posibles prefijos)
     VOLUME_NAME=$(docker volume ls --format '{{.Name}}' | grep "$volume")
 
@@ -73,4 +72,3 @@ for volume in $VOLUMES; do
 done
 
 echo "Todos los volúmenes han sido respaldados en la carpeta $BACKUP_DIR"
-    
