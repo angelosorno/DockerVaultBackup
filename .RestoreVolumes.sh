@@ -24,8 +24,7 @@ fi
 
 # Ajustar rutas según el sistema operativo
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
-    BACKUP_DIR_ABS="$(cd "$(pwd)" && pwd -W)/data/VolumesBackup"
-    BACKUP_DIR_ABS=$(echo "$BACKUP_DIR_ABS" | sed 's|\\|/|g')
+    BACKUP_DIR_ABS="/run/desktop/mnt/host$(cd "$(pwd)" && pwd -W | sed 's|\\|/|g')/data/VolumesBackup"
 else
     BACKUP_DIR_ABS=$(pwd)/$BACKUP_DIR
 fi
