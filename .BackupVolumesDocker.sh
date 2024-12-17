@@ -6,6 +6,16 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
+# Detectar si se usa docker-compose V1 o docker compose V2
+if docker-compose --version > /dev/null 2>&1; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+elif docker compose version > /dev/null 2>&1; then
+    DOCKER_COMPOSE_CMD="docker compose"
+else
+    echo "Docker Compose no está instalado. Instala Docker Compose para continuar."
+    exit 1
+fi
+
 # Cambiar al directorio padre si estamos dentro de DockerVaultBackup
 CURRENT_DIR=$(basename "$(pwd)")
 if [ "$CURRENT_DIR" == "DockerVaultBackup" ]; then
@@ -19,15 +29,6 @@ COMPOSE_FILE="compose.yml"
 # Verificar si el archivo compose.yml existe en el directorio actual
 if [ ! -f "$COMPOSE_FILE" ]; then
     echo "No se encontró el archivo $COMPOSE_FILE en el directorio actual. Asegúrate de estar en el directorio correcto."
-    exit 1
-fi
-
-# Extraer los nombres de los volúmenes definidos en el archivo compose.yml
-VOLUMES=$(docker compose -f "$COMPOSE_FILE" config --volumes)
-
-# Verificar si hay volúmenes listados
-if [ -z "$VOLUMES" ]; then
-    echo "No se encontraron volúmenes definidos en el archivo $COMPOSE_FILE"
     exit 1
 fi
 
@@ -46,28 +47,36 @@ fi
 # Mostrar la ruta final que Docker usará para montar
 echo "Ruta de backup: $BACKUP_DIR_ABS"
 
+# Obtener los nombres de los contenedores activos a partir del archivo compose.yml
+CONTAINERS=$($DOCKER_COMPOSE_CMD -f "$COMPOSE_FILE" ps --quiet)
+
+if [ -z "$CONTAINERS" ]; then
+    echo "No se encontraron contenedores activos definidos en $COMPOSE_FILE"
+    exit 1
+fi
+
+# Obtener volúmenes montados directamente desde los contenedores activos
+VOLUMES=$(docker inspect -f '{{ range .Mounts }}{{ .Name }}{{"\n"}}{{ end }}' $CONTAINERS | grep -v '^$' | sort | uniq)
+
+# Verificar si hay volúmenes listados
+if [ -z "$VOLUMES" ]; then
+    echo "No se encontraron volúmenes montados en los contenedores activos."
+    exit 1
+fi
+
 # Realizar un backup de cada volumen
-for volume in $VOLUMES; do
-    echo "Respaldo del volumen: $volume"
+for VOLUME_NAME in $VOLUMES; do
+    echo "Respaldo del volumen: $VOLUME_NAME"
 
-    # Buscar el nombre del volumen en Docker (con posibles prefijos)
-    VOLUME_NAME=$(docker volume ls --format '{{.Name}}' | grep "$volume")
-
-    if [ -n "$VOLUME_NAME" ]; then
-        # Verificar si el volumen existe en el sistema de Docker
-        if docker volume inspect "$VOLUME_NAME" > /dev/null 2>&1; then
-            # Crear el backup del volumen en un archivo tar.gz
-            docker run --rm -v "${VOLUME_NAME}:/data" -v "$BACKUP_DIR_ABS:/backup" busybox sh -c "cd /data && tar czf /backup/${VOLUME_NAME}.tar.gz ."
-            if [ $? -eq 0 ]; then
-                echo "Volumen $VOLUME_NAME respaldado correctamente en $BACKUP_DIR"
-            else
-                echo "Error al respaldar el volumen $VOLUME_NAME"
-            fi
+    if docker volume inspect "$VOLUME_NAME" > /dev/null 2>&1; then
+        docker run --rm -v "${VOLUME_NAME}:/data" -v "$BACKUP_DIR_ABS:/backup" busybox sh -c "cd /data && tar czf /backup/${VOLUME_NAME}.tar.gz ."
+        if [ $? -eq 0 ]; then
+            echo "Volumen $VOLUME_NAME respaldado correctamente en $BACKUP_DIR"
         else
-            echo "El volumen $VOLUME_NAME no existe en el demonio Docker."
+            echo "Error al respaldar el volumen $VOLUME_NAME"
         fi
     else
-        echo "No se encontró ningún volumen que coincida con $volume"
+        echo "El volumen $VOLUME_NAME no existe en el demonio Docker."
     fi
 done
 
